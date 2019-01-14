@@ -75,4 +75,26 @@ public class RandomArray extends Random {
 	public String toString() {
 		return Arrays.toString(source);
 	}
+
+	@Override
+	public boolean isPseudo() {
+		for (Random random : source) {
+			if (!random.isPseudo()) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	@Override
+	public Random clone() {
+		Random[] array = new Random[source.length];
+		for (int index = 0; index < array.length; index++) {
+			array[index] = source[index].clone();
+		}
+		RandomArray clone = new RandomArray(array);
+		clone.index = index;
+		clone.counter = counter;
+		return clone;
+	}
 }

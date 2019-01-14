@@ -27,6 +27,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
 
 import nl.knokko.util.bits.BitHelper;
 import nl.knokko.util.bits.BitInput;
@@ -139,6 +140,12 @@ public class CrazyRandom extends Random {
 		Random random = new PseudoRandom(System.nanoTime());
 		for (int count = 0; count < 10; count++)
 			writeLong(random.nextInt(MAX_INDEX + 1), random.nextLong());
+		
+		int swapLength = 5000 + random.nextInt(10000);
+		int swapIndex = random.nextInt(LENGTH - swapLength);
+		for (int index = 0; index < swapLength; index++) {
+			state[index + swapIndex] = !state[index + swapIndex];
+		}
 	}
 
 	protected long readLong(int index) {
@@ -167,5 +174,17 @@ public class CrazyRandom extends Random {
 		int bound = index + amount;
 		for (; index < bound; index++)
 			state[index] = !state[index];
+	}
+
+	@Override
+	public boolean isPseudo() {
+		return false;
+	}
+	
+	@Override
+	public CrazyRandom clone() {
+		CrazyRandom clone = new CrazyRandom(Arrays.copyOf(state, state.length), index);
+		clone.counter = counter;
+		return clone;
 	}
 }

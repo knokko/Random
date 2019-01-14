@@ -43,6 +43,23 @@ public abstract class Random {
 	 * @return the next random boolean
 	 */
 	public abstract boolean next();
+	
+	/**
+	 * Checks whether or not this random instance is completely pseudo-random. In other words, can all the
+	 * results of this random instance be reproduced.
+	 * @return true if this is a fully pseudo random number generator, false otherwise
+	 */
+	public abstract boolean isPseudo();
+	
+	/**
+	 * Clones this random instance and returns the clone. Calling methods of the clone must not affect the
+	 * results of the methods of this random instance.
+	 * If this is a pseudo random number generator, the clone must return the same values if the same methods
+	 * are called in the same order with the same parameters.
+	 * 
+	 * @return a clone of this random instance
+	 */
+	public abstract Random clone();
 
 	/**
 	 * This method does the same as next(), but its name is more clear.

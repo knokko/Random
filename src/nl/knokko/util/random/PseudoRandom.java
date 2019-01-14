@@ -293,4 +293,17 @@ public class PseudoRandom extends Random {
 	public byte getReplaceCounter() {
 		return replaceCounter;
 	}
+
+	@Override
+	public boolean isPseudo() {
+		return true;
+	}
+
+	@Override
+	public Random clone() {
+		PseudoRandom clone = new PseudoRandom(Arrays.copyOf(data, data.length));
+		clone.replaceCounter = replaceCounter;
+		clone.shiftCounter = shiftCounter;
+		return clone;
+	}
 }
