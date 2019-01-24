@@ -26,6 +26,16 @@ package nl.knokko.util.random;
 import nl.knokko.util.bits.BitHelper;
 
 public abstract class Random {
+	
+	private static final int[] INT_2_POWERS = new int[30];
+	
+	static {
+		int factor = 1;
+		for (int index = 0; index < INT_2_POWERS.length; index++) {
+			INT_2_POWERS[index] = factor;
+			factor *= 2;
+		}
+	}
 
 	public static byte getRequiredBits(long number) {
 		byte b = 0;
@@ -189,14 +199,48 @@ public abstract class Random {
 		}
 		return Double.longBitsToDouble(BitHelper.makeLong(b0, b1, b2, b3, b4, b5, b6, b7));
 	}
+	
+	/**
+	 * This should be faster than nextInt(int), but the chances are less balanced
+	 * @param bound The bound, which is the maximum result + 1
+	 * @return a random int in the range [0, bound>
+	 */
+	public int fastNextInt(int bound) {
+		byte bits = getRequiredBits(bound - 1);
+		boolean[] bools = nextBooleans(bits);
+		int result = 0;
+		for (int index = 0; index < bools.length; index++) {
+			if (bools[index]) {
+				result += INT_2_POWERS[index];
+			}
+		}
+		if (result >= bound) {
+			result -= bound;
+		}
+		return result;
+	}
 
 	public int nextInt(int bound) {
 		byte bits = getRequiredBits(bound - 1);
-		long result;
+		int safetyCounter = 0;
+		int result;
 		do {
-			result = BitHelper.numberFromBinary(nextBooleans(bits), bits, false);
+			boolean[] bools = nextBooleans(bits);
+			result = 0;
+			for (int index = 0; index < bools.length; index++) {
+				if (bools[index]) {
+					result += INT_2_POWERS[index];
+				}
+			}
+			
+			// Prevent freezes with broken random number generators
+			safetyCounter++;
+			if (safetyCounter > 50) {
+				result -= bound;
+				break;
+			}
 		} while (result >= bound);
-		return (int) result;
+		return result;
 	}
 
 	public long nextLong(long bound) {
