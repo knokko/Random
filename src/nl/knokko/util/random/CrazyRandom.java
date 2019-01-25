@@ -34,6 +34,8 @@ import nl.knokko.util.bits.BitInput;
 import nl.knokko.util.bits.BitInputStream;
 import nl.knokko.util.bits.BitOutput;
 import nl.knokko.util.bits.BitOutputStream;
+import nl.knokko.util.random.PseudoRandom.Configuration;
+
 import static nl.knokko.util.bits.BitHelper.byteFromBinary;
 
 public class CrazyRandom extends Random {
@@ -42,8 +44,9 @@ public class CrazyRandom extends Random {
 		BitInput input = new BitInputStream(new FileInputStream(file));
 		boolean[] state = input.readBooleans(32000);
 		input.terminate();
-		PseudoRandom temp = new PseudoRandom(System.nanoTime());
-		int index = temp.nextInt(MAX_INDEX + 1);
+		//PseudoRandom temp = new PseudoRandom(System.nanoTime());
+		//int index = temp.nextInt(MAX_INDEX + 1);
+		int index = (int) (System.currentTimeMillis() % (MAX_INDEX + 1));
 		return new CrazyRandom(state, index);
 	}
 
@@ -100,7 +103,7 @@ public class CrazyRandom extends Random {
 
 	protected void clearTrace() {
 		PseudoRandom temp = new PseudoRandom(readLong(index), readLong(index + 256), readLong(index + 512),
-				readLong(index + 768));
+				readLong(index + 768), Configuration.LEGACY);
 		addLong(index, temp.nextLong());
 		addLong(index + 256, temp.nextLong());
 		addLong(index + 512, temp.nextLong());
@@ -116,28 +119,28 @@ public class CrazyRandom extends Random {
 
 	protected void superMix() {
 		Random first = new PseudoRandom(System.nanoTime(), System.identityHashCode(this), System.currentTimeMillis(),
-				System.identityHashCode(System.out));
-		RandomArray second = RandomArray.createPseudo(first.nextBytes(640));
+				System.identityHashCode(System.out), Configuration.LEGACY);
+		RandomArray second = RandomArray.createPseudo(Configuration.LEGACY, first.nextBytes(640));
 		for (int count = 0; count < 1000; count++)
 			addLong(second.nextInt(MAX_INDEX + 1), second.nextLong());
 	}
 
 	protected void strongMix() {
 		Random first = new PseudoRandom(System.nanoTime(), readLong(index), readLong(index + 256),
-				readLong(index + 512));
-		RandomArray second = RandomArray.createPseudo(first.nextBytes(128));
+				readLong(index + 512), Configuration.LEGACY);
+		RandomArray second = RandomArray.createPseudo(Configuration.LEGACY, first.nextBytes(128));
 		for (int count = 0; count < 100; count++)
 			addLong(second.nextInt(MAX_INDEX + 1), second.nextLong());
 	}
 
 	protected void mediumMix() {
-		Random random = new PseudoRandom(System.nanoTime());
+		Random random = new PseudoRandom(System.nanoTime(), Configuration.LEGACY);
 		for (int count = 0; count < 40; count++)
 			writeLong(random.nextInt(MAX_INDEX + 1), random.nextLong());
 	}
 
 	protected void weakMix() {
-		Random random = new PseudoRandom(System.nanoTime());
+		Random random = new PseudoRandom(System.nanoTime(), Configuration.LEGACY);
 		for (int count = 0; count < 10; count++)
 			writeLong(random.nextInt(MAX_INDEX + 1), random.nextLong());
 		

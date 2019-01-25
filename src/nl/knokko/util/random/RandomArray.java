@@ -36,14 +36,14 @@ public class RandomArray extends Random {
 		return div;
 	}
 
-	public static RandomArray createPseudo(byte... bytes) {
+	public static RandomArray createPseudo(PseudoRandom.Configuration config, byte... bytes) {
 		Random[] source = new Random[ceilDiv(bytes.length, 32)];
 		bytes = Arrays.copyOf(bytes, 32 * ceilDiv(bytes.length, 32));
 		ByteArrayBitInput input = new ByteArrayBitInput(bytes);// if the amount of bytes can't be divided through 32,
 																// the remaining bytes will be 0
 		for (int index = 0; index < source.length; index++) {
 			source[index] = new PseudoRandom(input.readInt(), input.readInt(), input.readInt(), input.readInt(),
-					input.readInt(), input.readInt(), input.readInt(), input.readInt());
+					input.readInt(), input.readInt(), input.readInt(), input.readInt(), config);
 		}
 		return new RandomArray(source);
 	}
