@@ -31,6 +31,12 @@ import static nl.knokko.util.bits.BitHelper.byteToBinary;
 
 public class PseudoRandom extends Random {
 
+	public static long XOR_TIME = 0;
+	public static long SHIFT_TIME1 = 0;
+	public static long REPLACE_TIME = 0;
+	public static long SHIFT_TIME2 = 0;
+	public static long INVERT_TIME = 0;
+
 	private static final int INDEX = 77;
 	private static final int SHIFTER = 214;
 
@@ -51,19 +57,28 @@ public class PseudoRandom extends Random {
 		return result;
 	}
 
-	protected final boolean[] data;
+	private final boolean[] data;
 
-	private byte replaceCounter;
-	private byte shiftCounter;
+	private Configuration config;
 
-	public PseudoRandom() {
+	private int xorCounter;
+	private int shiftCounter1;
+	private int replaceCounter;
+	private int shiftCounter2;
+	private int invertCounter;
+
+	private byte shiftAmount;
+
+	public PseudoRandom(Configuration config) {
+		this.config = config;
 		data = new boolean[256];
 		long millis = System.currentTimeMillis();
 		long nanos = System.nanoTime();
 		seed(millis * millis, nanos * nanos, millis * nanos, millis + nanos);
 	}
 
-	public PseudoRandom(String seed) {
+	public PseudoRandom(String seed, Configuration config) {
+		this.config = config;
 		int totalLength = seed.length();
 		if (totalLength / 16 * 16 != totalLength)
 			throw new IllegalArgumentException("Can't divide totalLength (" + totalLength + ") through 16");
@@ -81,29 +96,37 @@ public class PseudoRandom extends Random {
 		data = helper.getRawBooleans();
 	}
 
-	public PseudoRandom(boolean[] data) {
+	public PseudoRandom(boolean[] data, Configuration config) {
+		this.config = config;
 		if (data.length == 256)
 			this.data = data;
 		else
 			throw new IllegalArgumentException("Length must be 256, not " + data.length);
 	}
 
-	public PseudoRandom(long seed1) {
-		this(seed1, seed1 / 3487834, seed1 * 9678538, seed1 - 14396);
+	public PseudoRandom(long seed1, Configuration config) {
+		this(seed1, seed1 / 3487834, seed1 * 9678538, seed1 - 14396, config);
 	}
 
-	public PseudoRandom(long seed1, long seed2, long seed3, long seed4) {
+	public PseudoRandom(long seed1, long seed2, long seed3, long seed4, Configuration config) {
+		this.config = config;
 		data = new boolean[256];
 		seed(seed1, seed2, seed3, seed4);
 	}
 
-	public PseudoRandom(int seed1, int seed2) {
-		this(seed1, seed1 / 31, seed1 * 97, seed1 - 198345, seed2, seed2 / 31, seed2 * 97, seed2 - 198345);
+	public PseudoRandom(int seed1, int seed2, Configuration config) {
+		this(seed1, seed1 / 31, seed1 * 97, seed1 - 198345, seed2, seed2 / 31, seed2 * 97, seed2 - 198345, config);
 	}
 
-	public PseudoRandom(int seed1, int seed2, int seed3, int seed4, int seed5, int seed6, int seed7, int seed8) {
+	public PseudoRandom(int seed1, int seed2, int seed3, int seed4, int seed5, int seed6, int seed7, int seed8,
+			Configuration config) {
+		this.config = config;
 		data = new boolean[256];
 		seed(seed1, seed2, seed3, seed4, seed5, seed6, seed7, seed8);
+	}
+
+	public void setConfig(Configuration config) {
+		this.config = config;
 	}
 
 	@Override
@@ -151,11 +174,22 @@ public class PseudoRandom extends Random {
 	public boolean next() {
 		int oldIndex = getIndex();
 		boolean result = data[oldIndex];
-		xor(oldIndex, HARD_MASK);// only 256 possibilities to try
-		shift(getAt(SHIFTER) + 50);// only 256 possibilities to try
-		replace(getIndex() + 69, result);// good luck with reversing this one...
-		shift(getAt(getIndex() - 22) + shiftCounter++);// can be reversed by trying all 256 possible previous indices
-		invert(getAt(getIndex() + 17));// the index may or may not have overwritten itself
+		long startTime = System.nanoTime();
+		xor(oldIndex);// only 256 possibilities to try
+		XOR_TIME += System.nanoTime() - startTime;
+		startTime = System.nanoTime();
+		shift1();// only 256 possibilities to try
+		SHIFT_TIME1 += System.nanoTime() - startTime;
+		startTime = System.nanoTime();
+		replace(result);// good luck with reversing this one...
+		REPLACE_TIME += System.nanoTime() - startTime;
+		startTime = System.nanoTime();
+		shift2();// can be reversed by trying all 256 possible previous
+					// indices
+		SHIFT_TIME2 += System.nanoTime() - startTime;
+		startTime = System.nanoTime();
+		invert();// the index may or may not have overwritten itself
+		INVERT_TIME += System.nanoTime() - startTime;
 		setIndex(getAt(getIndex() - 96));// can be reversed by trying all 256 possible previous indices
 		return result;
 	}
@@ -221,15 +255,53 @@ public class PseudoRandom extends Random {
 		setAt(INDEX, index);
 	}
 
+	private void xor(int oldIndex) {
+		if (xorCounter <= 0) {
+			xor(oldIndex, HARD_MASK);
+			xorCounter = config.xorPeriod;
+		} else {
+			xorCounter--;
+			if (data[10]) {
+				xorCounter--;
+			}
+		}
+	}
+
 	private void xor(int index, boolean[] mask) {
 		int maskIndex = 0;
 		for (; maskIndex + index < 256; maskIndex++) {
-			if (mask[maskIndex])
+			if (mask[maskIndex]) {
 				data[index + maskIndex] = !data[index + maskIndex];
+			}
 		}
 		for (; maskIndex < 256; maskIndex++) {
-			if (mask[maskIndex])
+			if (mask[maskIndex]) {
 				data[index + maskIndex - 256] = !data[index + maskIndex - 256];
+			}
+		}
+	}
+
+	private void shift1() {
+		if (shiftCounter1 <= 0) {
+			shift(getAt(SHIFTER) + 50);
+			shiftCounter1 = config.shiftPeriod1;
+		} else {
+			shiftCounter1--;
+			if (data[7]) {
+				shiftCounter1--;
+			}
+		}
+	}
+
+	private void shift2() {
+		if (shiftCounter2 <= 0) {
+			shift(getAt(getIndex() - 22) + shiftAmount++);
+			shiftCounter2 = config.shiftPeriod2;
+		} else {
+			shiftCounter2--;
+			if (data[12]) {
+				shiftCounter2--;
+			}
 		}
 	}
 
@@ -238,31 +310,36 @@ public class PseudoRandom extends Random {
 		setAt(direction, backup);
 	}
 
-	private void replace(int baseIndex, boolean value) {
+	private void replace(boolean result) {
 		if (replaceCounter <= 0) {
-			int[] firstIndices = new int[32];
-			for (int i = 0; i < 32; i++)
-				firstIndices[i] = getAt(baseIndex + i * 8);
-			int[] secondIndices = new int[256];
-			for (int i = 0; i < 32; i++) {
-				secondIndices[i * 8 + 0] = getAt(firstIndices[i] + 0);
-				secondIndices[i * 8 + 1] = getAt(firstIndices[i] + 23);
-				secondIndices[i * 8 + 2] = getAt(firstIndices[i] + 143);
-				secondIndices[i * 8 + 3] = getAt(firstIndices[i] + 12);
-				secondIndices[i * 8 + 4] = getAt(firstIndices[i] - 74);
-				secondIndices[i * 8 + 5] = getAt(firstIndices[i] - 213);
-				secondIndices[i * 8 + 6] = getAt(firstIndices[i] + 176);
-				secondIndices[i * 8 + 7] = getAt(firstIndices[i] + 58);
-			}
-			boolean[] copy = Arrays.copyOf(data, 256);
-			for (int index = 0; index < 256; index++)
-				data[index] = copy[secondIndices[index]];
-			replaceCounter = 29;
+			replace(getIndex() + 69, result);
+			replaceCounter = config.replacePeriod;
 		} else {
-			--replaceCounter;
-			if (value)
+			replaceCounter--;
+			if (result) {
 				--replaceCounter;
+			}
 		}
+	}
+
+	private void replace(int baseIndex, boolean value) {
+		int[] firstIndices = new int[32];
+		for (int i = 0; i < 32; i++)
+			firstIndices[i] = getAt(baseIndex + i * 8);
+		int[] secondIndices = new int[256];
+		for (int i = 0; i < 32; i++) {
+			secondIndices[i * 8 + 0] = getAt(firstIndices[i] + 0);
+			secondIndices[i * 8 + 1] = getAt(firstIndices[i] + 23);
+			secondIndices[i * 8 + 2] = getAt(firstIndices[i] + 143);
+			secondIndices[i * 8 + 3] = getAt(firstIndices[i] + 12);
+			secondIndices[i * 8 + 4] = getAt(firstIndices[i] - 74);
+			secondIndices[i * 8 + 5] = getAt(firstIndices[i] - 213);
+			secondIndices[i * 8 + 6] = getAt(firstIndices[i] + 176);
+			secondIndices[i * 8 + 7] = getAt(firstIndices[i] + 58);
+		}
+		boolean[] copy = Arrays.copyOf(data, 256);
+		for (int index = 0; index < 256; index++)
+			data[index] = copy[secondIndices[index]];
 
 		/*
 		 * Crack 0101010101010101...
@@ -279,6 +356,18 @@ public class PseudoRandom extends Random {
 		 */
 	}
 
+	private void invert() {
+		if (invertCounter <= 0) {
+			invert(getAt(getIndex() + 17));
+			invertCounter = config.invertPeriod;
+		} else {
+			invertCounter--;
+			if (data[3]) {
+				invertCounter--;
+			}
+		}
+	}
+
 	private void invert(int index) {
 		boolean[] bools = getAt(index, 15);
 		for (int i = 0; i < bools.length; i++)
@@ -290,7 +379,7 @@ public class PseudoRandom extends Random {
 		return Arrays.copyOf(data, 256);
 	}
 
-	public byte getReplaceCounter() {
+	public int getReplaceCounter() {
 		return replaceCounter;
 	}
 
@@ -301,9 +390,32 @@ public class PseudoRandom extends Random {
 
 	@Override
 	public Random clone() {
-		PseudoRandom clone = new PseudoRandom(Arrays.copyOf(data, data.length));
+		PseudoRandom clone = new PseudoRandom(Arrays.copyOf(data, data.length), config);
+		clone.xorCounter = xorCounter;
+		clone.shiftCounter1 = shiftCounter1;
 		clone.replaceCounter = replaceCounter;
-		clone.shiftCounter = shiftCounter;
+		clone.shiftCounter2 = shiftCounter2;
+		clone.invertCounter = invertCounter;
+		clone.shiftAmount = shiftAmount;
 		return clone;
+	}
+
+	public static class Configuration {
+
+		public static final Configuration LEGACY = new Configuration(0, 0, 29, 0, 0);
+
+		private final int xorPeriod;
+		private final int shiftPeriod1;
+		private final int replacePeriod;
+		private final int shiftPeriod2;
+		private final int invertPeriod;
+
+		public Configuration(int xorPeriod, int shiftPeriod1, int replacePeriod, int shiftPeriod2, int invertPeriod) {
+			this.xorPeriod = xorPeriod;
+			this.shiftPeriod1 = shiftPeriod1;
+			this.replacePeriod = replacePeriod;
+			this.shiftPeriod2 = shiftPeriod2;
+			this.invertPeriod = invertPeriod;
+		}
 	}
 }
