@@ -93,7 +93,7 @@ public class PseudoRandom extends Random {
 				helper.setWriteIndex(0);
 			}
 		}
-		data = helper.getRawBooleans();
+		data = helper.getBackingArray();
 	}
 
 	public PseudoRandom(boolean[] data, Configuration config) {
@@ -401,8 +401,18 @@ public class PseudoRandom extends Random {
 	}
 
 	public static class Configuration {
-
+		
+		/**
+		 * The 'legacy' configuration. This is a quite heavy configuration for the random number generator,
+		 * where heavy means that generating a lot of random data takes relatively long. This is not really
+		 * a bad configuration, but it is 'legacy' because all random number generators before configurations
+		 * were added had this 'configuration'.
+		 */
 		public static final Configuration LEGACY = new Configuration(0, 0, 29, 0, 0);
+		
+		public static final Configuration MEDIUM = new Configuration(10, 11, 12, 101, 13);
+		
+		public static final Configuration LIGHT = new Configuration(57, 34, 491, 40, 67);
 
 		private final int xorPeriod;
 		private final int shiftPeriod1;
